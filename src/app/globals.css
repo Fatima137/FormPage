@@ -1,0 +1,286 @@
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: var(--font-inter), Arial, Helvetica, sans-serif; /* Ensure Inter is primary */
+  overflow-x: hidden; /* Prevent horizontal scroll from scaled wrapper */
+}
+
+html, body {
+  height: 100%;
+  margin: 0;
+}
+
+#zoom-wrapper {
+  width: calc(100% / 0.7); 
+  height: calc(100% / 0.7);
+  transform: scale(0.7);
+  transform-origin: top left;
+}
+
+
+@layer base {
+  :root {
+    /* New Brand Theme - Off-white background */
+    --background: 0 0% 98%;    /* #FAFAFA; Off-white */
+    --foreground: 0 0% 10%;    /* #1A1A1A; Primary Text */
+
+    --card: 0 0% 100%;         /* #FFFFFF; Card Background */
+    --card-foreground: 0 0% 10%; /* #1A1A1A; Text on Card */
+
+    --popover: 0 0% 100%;      /* #FFFFFF; Popover Background */
+    --popover-foreground: 0 0% 10%; /* #1A1A1A; Text on Popover */
+
+    --primary: 288 56% 76%;    /* #D1A3E0; Lavender Accent */
+    --primary-foreground: 0 0% 100%; /* White, for contrast on primary */
+    
+    --button-hover: 288 45% 68%; /* #B980D1; Darker Lavender for hover */
+    
+    /* Secondary - derived for subtlety against new off-white background */
+    --secondary: 0 0% 94%;     /* #F0F0F0; Light grey, slightly darker than background */
+    --secondary-foreground: 0 0% 10%; /* #1A1A1A; Text on secondary */
+
+    --secondary-bg-subtle: 0 0% 96%; /* #F5F5F5; Very light grey for subtle elements */
+    --secondary-fg-subtle: 0 0% 20%;   /* Slightly lighter than main foreground */
+
+    --muted: 0 0% 90%;         /* #E5E5E5; Muted background color */
+    --muted-foreground: 0 0% 31%; /* #4F4F4F; Secondary Text */
+
+    --accent: 288 56% 76%;     /* #D1A3E0; Lavender Accent, same as primary */
+    --accent-foreground: 0 0% 100%; /* White */
+
+    --destructive: 0 84.2% 60.2%; 
+    --destructive-foreground: 0 0% 98%; 
+
+    --border: 0 0% 88%;        /* #E0E0E0; Divider Color */
+    --input: 0 0% 95%;         /* #F2F2F2; Light grey for input backgrounds */
+    --ring: 288 56% 76%;       /* #D1A3E0; Lavender Accent, for focus rings */
+
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 16px; /* Global border radius */
+
+    /* Solution specific colors - adjusted for pop against new off-white background */
+    --pulse-bg: 28 100% 94%; /* Lighter vibrant orange */
+    --pulse-icon-fg: 25 85% 55%;  /* Brighter orange icon */
+    --pulse-title-fg: 25 85% 55%; /* Matches icon */
+    --pulse-icon-container-bg: 28 100% 88%; /* Lighter orange background for icon container */
+
+    --explore-bg: 125 70% 94%; /* Lighter vibrant green */
+    --explore-icon-fg: 120 50% 50%; /* More vibrant green icon */
+    --explore-title-fg: 120 50% 50%; /* Matches icon */
+    --explore-icon-container-bg: 125 70% 88%; /* Lighter green background for icon container */
+
+    --test-bg: 328 100% 95%; /* Lighter vibrant pink */
+    --test-icon-fg: 328 70% 63%; /* Brighter pink/magenta icon */
+    --test-title-fg: 328 70% 63%; /* Matches icon */
+    --test-icon-container-bg: 328 100% 90%; /* Lighter pink background for icon container */
+
+    --chatbot-bg: 288 56% 76%; /* #D1A3E0; Lavender Accent */
+    --chatbot-fg: 0 0% 100%; /* White */
+
+    /* Profile Widget specific colors */
+    --profile-avatar-bg: 0 0% 100%; 
+    --profile-avatar-hover-bg: 288 50% 95%; /* Very light tint of accent-purple */
+    --profile-avatar-icon-fg: 288 56% 76%;  /* accent-purple */
+    --dropdown-item-icon-default-fg: 288 56% 76%; /* accent-purple */
+
+    /* Lavender Accent (primary accent) */
+    --lavender-accent: 288 56% 76%; /* #D1A3E0; */
+    --lavender-accent-foreground: 0 0% 100%; /* White */
+    --soft-lavender-hover-bg: 288 50% 93%; /* #E9E1FB; Lighter tint of lavender-accent for hover */
+
+    /* Explore page specific template card colors - adjust for off-white background */
+    --explore-template-bg: 125 60% 96%; /* Very light green, ensures contrast */
+    --explore-template-bg-hover: 125 60% 93%; 
+    --explore-template-border: hsl(var(--lavender-accent)); 
+    --explore-template-icon-fg: 120 45% 45%; 
+    --explore-template-icon-fg-selected: hsl(var(--lavender-accent)); 
+    --explore-template-text-header-fg: 0 0% 12%; 
+    --explore-template-text-subheader-fg: 0 0% 35%; 
+    
+    /* Test page specific template card colors - adjust for off-white background */
+    --test-template-card-bg: 328 100% 97%; /* Very light pink, ensures contrast */
+    --test-template-card-bg-hover: 328 100% 94%; 
+    --test-template-card-border: hsl(var(--lavender-accent)); 
+    --test-template-card-icon-fg: hsl(var(--test-icon-fg)); 
+    --test-template-card-icon-fg-selected: hsl(var(--lavender-accent)); 
+
+    --progress-bar-bg: 0 0% 90%; /* Muted version of new background */
+    --progress-bar-fill: hsl(var(--lavender-accent)); 
+    
+    --action-button-bg: hsl(var(--lavender-accent)); 
+    --action-button-fg: hsl(var(--lavender-accent-foreground)); 
+
+    --empty-preview-bg: 0 0% 96%; /* #F5F5F5; Very light tint of new background */
+  }
+
+  .dark {
+    /* Dark theme - Adjustments for vibrant accents */
+    --background: 280 10% 12%; /* Darker purple-ish grey */
+    --foreground: 290 40% 95%; /* Lighter, slightly tinted foreground */
+
+    --card: 280 10% 18%;
+    --card-foreground: 290 40% 95%;
+
+    --popover: 280 10% 18%;
+    --popover-foreground: 290 40% 95%;
+
+    --primary: 288 60% 80%; /* Brighter accent-purple for dark mode */
+    --primary-foreground: 0 0% 10%; /* Dark text for contrast on bright purple */
+    
+    --button-hover: 288 50% 72%; /* Darker hover for primary */
+
+    --secondary: 280 10% 28%;
+    --secondary-foreground: 290 40% 95%;
+    
+    --secondary-bg-subtle: 280 10% 22%;
+    --secondary-fg-subtle: 290 30% 88%;
+
+    --muted: 280 10% 25%;
+    --muted-foreground: 290 20% 65%; /* Lighter muted text */
+
+    --accent: 288 60% 80%; /* Same as primary */
+    --accent-foreground: 0 0% 10%; 
+
+    --destructive: 0 70% 55%;
+    --destructive-foreground: 0 0% 98%;
+
+    --border: 0 0% 25%;        /* Darker grey border */
+    --input: 0 0% 20%;         /* Darker input background */
+    --ring: hsl(var(--primary)); /* Use primary accent for dark theme rings */
+    
+    --chart-1: 220 70% 50%;
+    --chart-2: 160 60% 45%;
+    --chart-3: 30 80% 55%;
+    --chart-4: 280 65% 60%;
+    --chart-5: 340 75% 55%;
+
+    /* Solution cards in dark mode - use more intense versions of their colors */
+    --pulse-bg: 28 80% 15%; 
+    --pulse-icon-fg: 25 90% 65%;  
+    --pulse-title-fg: 25 90% 65%;
+    --pulse-icon-container-bg: 28 80% 25%;
+
+
+    --explore-bg: 125 50% 15%; 
+    --explore-icon-fg: 120 55% 65%; 
+    --explore-title-fg: 120 55% 65%;
+    --explore-icon-container-bg: 125 50% 25%;
+
+    --test-bg: 328 70% 18%; 
+    --test-icon-fg: 328 75% 75%; 
+    --test-title-fg: 328 75% 75%;
+    --test-icon-container-bg: 328 70% 28%;
+
+
+    --chatbot-bg: 288 50% 70%; /* Brighter chatbot bg for dark */
+    --chatbot-fg: 0 0% 100%;
+
+    /* Profile Widget specific colors - Dark Theme */
+    --profile-avatar-bg: 280 10% 20%; 
+    --profile-avatar-hover-bg: 280 10% 25%; 
+    --profile-avatar-icon-fg: 288 60% 80%;  /* Brighter accent-purple */
+    --dropdown-item-icon-default-fg: 288 60% 80%; 
+    --soft-lavender-hover-bg: 288 50% 35%; /* Darker lavender for hover in dark mode */
+
+
+    /* Explore page specific colors - Dark theme */
+    --explore-template-bg: 125 30% 20%; 
+    --explore-template-bg-hover: 125 30% 25%;
+    --explore-template-border: hsl(var(--lavender-accent)); 
+    --explore-template-icon-fg: 120 55% 70%; 
+    --explore-template-icon-fg-selected: hsl(var(--lavender-accent));
+    --explore-template-text-header-fg: 290 30% 90%; 
+    --explore-template-text-subheader-fg: 290 20% 80%;
+
+    /* Test page specific template card colors - Dark theme */
+    --test-template-card-bg: 328 70% 22%; 
+    --test-template-card-bg-hover: 328 70% 28%; 
+    --test-template-card-border: hsl(var(--lavender-accent)); 
+    --test-template-card-icon-fg: hsl(var(--test-icon-fg)); 
+    --test-template-card-icon-fg-selected: hsl(var(--lavender-accent));
+    
+    --progress-bar-bg: 280 10% 30%;
+    --progress-bar-fill: hsl(var(--lavender-accent)); 
+    
+    --action-button-bg: hsl(var(--lavender-accent)); 
+    --action-button-fg: hsl(var(--lavender-accent-foreground));
+
+    --empty-preview-bg: 0 0% 15%; /* Darker, more neutral empty preview for dark mode */
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  /* Drag and Drop Styles */
+  body.dragging {
+    cursor: grabbing !important;
+    user-select: none;
+  }
+
+  .drag-over-top {
+    border-top: 2px dashed hsl(var(--lavender-accent)) !important;
+    @apply !shadow-none;
+  }
+
+  .drag-over-bottom {
+    border-bottom: 2px dashed hsl(var(--lavender-accent)) !important;
+    @apply !shadow-none;
+  }
+
+}
+
+/* Custom utility for dropdown item hover/focus to use primary foreground text on soft-lavender-hover-bg */
+.dropdown-item-lavender-hover {
+  @apply hover:bg-[hsl(var(--soft-lavender-hover-bg))] hover:text-primary-foreground focus:bg-[hsl(var(--soft-lavender-hover-bg))] focus:text-primary-foreground;
+}
+.dropdown-item-lavender-hover > svg {
+  @apply group-hover:text-primary-foreground group-focus:text-primary-foreground;
+}
+
+.dark .dropdown-item-lavender-hover {
+   @apply hover:bg-[hsl(var(--soft-lavender-hover-bg))] hover:text-primary-foreground focus:bg-[hsl(var(--soft-lavender-hover-bg))] focus:text-primary-foreground;
+}
+.dark .dropdown-item-lavender-hover > svg {
+   @apply group-hover:text-primary-foreground group-focus:text-primary-foreground;
+}
+
+@keyframes button-flash-effect {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1); /* default shadow-md */
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 20px hsl(var(--action-button-bg) / 0.6); /* glow effect */
+    opacity: 0.9;
+  }
+  100% {
+    transform: scale(1);
+    box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    opacity: 1;
+  }
+}
+
+.button-flash-animation {
+  animation: button-flash-effect 0.7s ease-in-out;
+}
+
+/* Ensure Inter font variable is correctly defined and used if it's in layout.tsx */
+:root {
+  --font-inter: "Inter", sans-serif; /* Or specific Inter variable from Next/Font */
+}

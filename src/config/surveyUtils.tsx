@@ -1,4 +1,3 @@
-
 import * as React from 'react';
 import type { SurveyQuestion } from '@/ai/flows/suggest-survey-questions';
 import {
@@ -32,7 +31,7 @@ export const formatQuestionTypeForDisplay = (type: SurveyQuestion['questionType'
   }
 };
 
-export const renderQuestionTextWithPlaceholdersGlobal = (text: string, dynamicPlaceholders: Record<string, string>, isPlaceholderContext: boolean = false): React.ReactNode => {
+export function renderQuestionTextWithPlaceholdersGlobal(text: string, dynamicPlaceholders = {}, isPlaceholderContext: boolean = false): React.ReactNode {
   if (!text) return '';
   const parts = text.split(/(\[[^\][]*?\])/g).filter(Boolean); // Capture placeholders like [this]
   return parts.map((part, i) => {
@@ -47,7 +46,7 @@ export const renderQuestionTextWithPlaceholdersGlobal = (text: string, dynamicPl
     }
     return <React.Fragment key={i}>{part}</React.Fragment>;
   });
-};
+}
 
 export const questionTypeIconMap: Record<SurveyQuestion['questionType'], LucideIcon> = {
   screener: Filter,

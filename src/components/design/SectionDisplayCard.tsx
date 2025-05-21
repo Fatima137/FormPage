@@ -20,6 +20,8 @@ interface SectionDisplayCardProps {
   onToggleExpand?: () => void;
   children?: React.ReactNode; // For AccordionContent
   cardColor?: 'green' | 'purple' | undefined;
+  showQuestions?: boolean;
+  className?: string;
 }
 
 export function SectionDisplayCard({
@@ -32,6 +34,8 @@ export function SectionDisplayCard({
   onToggleExpand,
   children,
   cardColor,
+  showQuestions = false,
+  className = '',
 }: SectionDisplayCardProps) {
   const SectionIcon = section.icon;
 
@@ -51,7 +55,7 @@ export function SectionDisplayCard({
 
   const textContainerClasses = "flex items-start gap-1.5 flex-grow";
   const iconWrapperClasses = "shrink-0";
-  const titleDescriptionClasses = "flex-grow";
+  const titleDescriptionClasses = "flex-grow space-y-1";
 
   let cardSpecificBgClass = 'bg-card'; // Default background
   let iconColorClass = 'text-[hsl(var(--lavender-accent))]'; // Default icon color
@@ -83,8 +87,8 @@ export function SectionDisplayCard({
           <SectionIcon className={cn("h-5 w-5 mt-0.5", iconColorClass)} />
         </div>
         <div className={titleDescriptionClasses}>
-          <h4 className="text-sm font-semibold text-foreground">{section.title}</h4>
-          <p className="text-xs text-muted-foreground line-clamp-2">{section.description}</p>
+          <h4 className="text-sm font-semibold text-foreground text-left">{section.title}</h4>
+          <p className="text-xs text-muted-foreground line-clamp-2 text-left">{section.description}</p>
         </div>
       </div>
       <Button
@@ -95,7 +99,7 @@ export function SectionDisplayCard({
           isCurrentlyIncluded ? iconColorClass : 'text-[hsl(var(--lavender-accent))]'
         )}
         onClick={(e) => {
-          e.stopPropagation(); // Prevent accordion from toggling if button is inside trigger
+          e.stopPropagation();
           onToggleSection();
         }}
         aria-label={isCurrentlyIncluded ? `Remove ${section.title}` : `Add ${section.title}`}
@@ -107,19 +111,33 @@ export function SectionDisplayCard({
 
   if (isExpandable) {
     return (
-      <Card className={cn(cardBaseClasses, cardSpecificBgClass)}>
-        <AccordionTrigger className="p-0 hover:no-underline [&_svg.lucide-chevron-down]:hidden" showChevron={!!children}>
-          {cardContent}
-        </AccordionTrigger>
-        {children && <AccordionContent className="p-2 pt-0">{children}</AccordionContent>}
-      </Card>
+      <AccordionItem value={section.title} className="border-none">
+        <Card className={cn(cardBaseClasses, cardSpecificBgClass, 'min-h-[120px] h-full flex flex-col justify-between', className)}>
+          <AccordionTrigger className="p-0 hover:no-underline [&_svg.lucide-chevron-down]:hidden" showChevron={!!children}>
+            {cardContent}
+          </AccordionTrigger>
+          {children && <AccordionContent className="p-2 pt-0">{children}</AccordionContent>}
+        </Card>
+      </AccordionItem>
     );
   }
 
   return (
-    <Card className={cn(cardBaseClasses, cardSpecificBgClass)}>
+    <Card className={cn(cardBaseClasses, cardSpecificBgClass, 'min-h-[120px] h-full flex flex-col justify-between', className)}>
       <CardContent className={cardContentClasses}>
         {cardContent}
+        {showQuestions && section.exampleQuestions && section.exampleQuestions.length > 0 && (
+          <div className="space-y-2 mt-2">
+            {section.exampleQuestions.map((question, index) => (
+              <div key={index} className="flex items-start gap-2 text-sm">
+                <QuestionTypeIcon type={question.questionType} className="h-4 w-4 mt-0.5 shrink-0" />
+                <span className="text-muted-foreground">
+                  {renderQuestionTextWithPlaceholdersGlobal(question.questionText)}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );

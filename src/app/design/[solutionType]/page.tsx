@@ -10,8 +10,8 @@ import type { PhotoConfig } from '@/components/design/PhotoSettingsModal';
 import type { VideoConfig } from '@/components/design/VideoSettingsModal';
 import type { SegmentationConfig } from '@/components/design/SegmentationSettingsModal';
 import type { TimeSeriesConfig } from '@/components/design/TimeSeriesSettingsModal';
-import { CustomizeSectionsModal } from '@/components/design/CustomizeSectionsModal'; 
-import { allAvailableSurveySections, allAvailableScreenerSections } from '@/config/availableSurveySections'; 
+import { CustomizeSectionsModal } from '@/components/design/CustomizeSectionsModal';
+import { allAvailableSurveySections, allAvailableScreenerSections } from '@/config/availableSurveySections';
 import { defaultCountries, type Country } from '@/config/countries';
 import { SurveyGuideModal } from '@/components/design/SurveyGuideModal';
 import { Chatbot } from '@/components/chatbot/Chatbot';
@@ -70,6 +70,13 @@ export default function DesignPage() {
   const [surveySections, setSurveySections] = React.useState<SurveySection[]>([]);
   const [generatedSurveyTitle, setGeneratedSurveyTitle] = React.useState<string>('');
   const [generatedSurveyIntroduction, setGeneratedSurveyIntroduction] = React.useState<string>('');
+  
+  // Template Customizations State
+  const [templateCustomizations, setTemplateCustomizations] = React.useState<Record<string, {
+    sections: SurveySection[],
+    frameworkSections: FrameworkSection[] | null,
+    screenerSections: FrameworkSection[] | null
+  }>>({});
   
   const [customizedScreenerSections, setCustomizedScreenerSections] = React.useState<FrameworkSection[] | null>(null);
   const [customizedFrameworkSections, setCustomizedFrameworkSections] = React.useState<FrameworkSection[] | null>(null);
@@ -150,19 +157,18 @@ export default function DesignPage() {
 
 
   const memoizedCurrentScreenerSections = React.useMemo(() => {
+    // Always use frameworkSections for both explore and test
     return customizedScreenerSections || (activeTemplate || locallySelectedTemplate)?.frameworkSections.filter(s => s.title.toLowerCase().startsWith('screener:')) || [];
   }, [customizedScreenerSections, activeTemplate, locallySelectedTemplate]);
 
   const memoizedCurrentContentSections = React.useMemo(() => {
     const baseTemplate = activeTemplate || locallySelectedTemplate;
     const templateContentSections = baseTemplate?.frameworkSections.filter(s => !s.title.toLowerCase().startsWith('screener:')) || [];
-    
     const currentCustomized = customizedFrameworkSections;
-
     if (currentCustomized) {
-        const allAvailableTitles = new Set(memoizedAllAvailableContentSections.map(s => s.title));
-        const validCustomizedSections = currentCustomized.filter(s => allAvailableTitles.has(s.title));
-        return validCustomizedSections;
+      const allAvailableTitles = new Set(memoizedAllAvailableContentSections.map(s => s.title));
+      const validCustomizedSections = currentCustomized.filter(s => allAvailableTitles.has(s.title));
+      return validCustomizedSections;
     }
     return templateContentSections;
   }, [customizedFrameworkSections, activeTemplate, locallySelectedTemplate, memoizedAllAvailableContentSections]);
@@ -292,12 +298,15 @@ export default function DesignPage() {
 
     setIsGenerating(true);
 
-    setSurveySections([]);
-    setGeneratedSurveyTitle('');
-    setGeneratedSurveyIntroduction('');
-    setEstimatedIncidenceRate(null);
-    setIncidenceRateRationale('');
-    setIncidenceRateSources([]);
+    // Only reset survey sections if we don't have any yet
+    if (surveySections.length === 0) {
+      setSurveySections([]);
+      setGeneratedSurveyTitle('');
+      setGeneratedSurveyIntroduction('');
+      setEstimatedIncidenceRate(null);
+      setIncidenceRateRationale('');
+      setIncidenceRateSources([]);
+    }
 
     let surveyDescription = "";
 
@@ -317,8 +326,8 @@ export default function DesignPage() {
          return;
       }
       surveyDescription = generateSurveyPrompt(activeTemplate, currentFollowUpAnswers);
-
     }
+
     const marketString = selectedCountries.map(c => c.label).join(', ');
     const projectContext = currentFollowUpAnswers['projectBigQuestion'] || undefined;
 
@@ -366,7 +375,7 @@ export default function DesignPage() {
       setIsGenerating(false);
     }
   }, [
-    isGenerating, setupComplete, solutionType, isPulseDescriptionValid, pulseSurveyDescription,
+    isGenerating, setupComplete, surveySections.length, solutionType, isPulseDescriptionValid, pulseSurveyDescription,
     activeTemplate, isFollowUpFormValid, currentFollowUpAnswers, generateSurveyPrompt,
     photoConfig, videoConfig, timeSeriesConfig, handleSurveyContentChange, toast, selectedCountries,
     currentSampleSize
@@ -380,7 +389,6 @@ export default function DesignPage() {
       setCurrentFollowUpAnswers(answers);
       setIsFollowUpFormValid(isValid);
     }
-    setSetupComplete(false);
   }, [solutionType]);
 
 
@@ -390,36 +398,67 @@ export default function DesignPage() {
 
   const handleLocalTemplateSelectionChange = React.useCallback((template: AnySolutionTemplate | null) => {
     setLocallySelectedTemplate(template);
-    setSetupComplete(false);
-    setSurveySections([]);
-    setGeneratedSurveyTitle('');
-    setGeneratedSurveyIntroduction('');
-    setCurrentFollowUpAnswers({});
-    setEstimatedIncidenceRate(null);
-    setIncidenceRateRationale('');
-    setIncidenceRateSources([]);
-    setCustomizedFrameworkSections(null);
-    setCustomizedScreenerSections(null);
-    setInitialFrameworkAnimationDone(false);
-  }, []);
+    if (template?.id !== locallySelectedTemplate?.id) {
+      // Save current template's customizations if any
+      if (locallySelectedTemplate?.id) {
+        persistCurrentTemplateCustomizations(
+          locallySelectedTemplate.id,
+          surveySections,
+          customizedFrameworkSections,
+          customizedScreenerSections,
+          setTemplateCustomizations
+        );
+      }
+      // Load new template's customizations if they exist
+      if (template?.id && templateCustomizations[template.id]) {
+        setSurveySections(templateCustomizations[template.id].sections);
+        setCustomizedFrameworkSections(templateCustomizations[template.id].frameworkSections);
+        setCustomizedScreenerSections(templateCustomizations[template.id].screenerSections);
+      } else {
+        setSurveySections([]);
+        setCustomizedFrameworkSections(null);
+        setCustomizedScreenerSections(null);
+      }
+      setGeneratedSurveyTitle('');
+      setGeneratedSurveyIntroduction('');
+      setCurrentFollowUpAnswers({});
+      setEstimatedIncidenceRate(null);
+      setIncidenceRateRationale('');
+      setIncidenceRateSources([]);
+      setInitialFrameworkAnimationDone(false);
+    }
+  }, [locallySelectedTemplate?.id, surveySections, customizedFrameworkSections, customizedScreenerSections, templateCustomizations]);
 
   const handleActiveTemplateChange = React.useCallback((template: AnySolutionTemplate | null) => {
+    if (activeTemplate?.id) {
+      persistCurrentTemplateCustomizations(
+        activeTemplate.id,
+        surveySections,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
+    }
     setActiveTemplate(template);
-    setSetupComplete(false);
-
-    setSurveySections([]);
-    setGeneratedSurveyTitle('');
-    setGeneratedSurveyIntroduction('');
-    setEstimatedIncidenceRate(null);
-    setIncidenceRateRationale('');
-    setIncidenceRateSources([]);
-
-    setCurrentFollowUpAnswers({});
-    setIsEditMode(false);
-    setCustomizedFrameworkSections(null);
-    setCustomizedScreenerSections(null);
-    setInitialFrameworkAnimationDone(false);
-
+    if (template?.id !== activeTemplate?.id) {
+      if (template?.id && templateCustomizations[template.id]) {
+        setSurveySections(templateCustomizations[template.id].sections);
+        setCustomizedFrameworkSections(templateCustomizations[template.id].frameworkSections);
+        setCustomizedScreenerSections(templateCustomizations[template.id].screenerSections);
+      } else {
+        setSurveySections([]);
+        setCustomizedFrameworkSections(null);
+        setCustomizedScreenerSections(null);
+      }
+      setGeneratedSurveyTitle('');
+      setGeneratedSurveyIntroduction('');
+      setEstimatedIncidenceRate(null);
+      setIncidenceRateRationale('');
+      setIncidenceRateSources([]);
+      setCurrentFollowUpAnswers({});
+      setIsEditMode(false);
+      setInitialFrameworkAnimationDone(false);
+    }
     if (template) {
       if (!template.followUpQuestions || template.followUpQuestions.length === 0) {
         setIsFollowUpFormValid(true);
@@ -429,7 +468,7 @@ export default function DesignPage() {
     } else {
       if (solutionType !== 'pulse') setIsFollowUpFormValid(false);
     }
-  },[solutionType]);
+  }, [solutionType, activeTemplate?.id, surveySections, customizedFrameworkSections, customizedScreenerSections, templateCustomizations]);
 
 
   const handleBackClick = React.useCallback(() => {
@@ -467,12 +506,31 @@ export default function DesignPage() {
   const handleGeneratedSurveyTitleChange = (newTitle: string) => setGeneratedSurveyTitle(newTitle);
   const handleGeneratedSurveyIntroductionChange = (newIntro: string) => setGeneratedSurveyIntroduction(newIntro);
 
-  const handleSectionChange = (sectionIndex: number, updatedData: Partial<SurveySection>) => {
-    setSurveySections(prevSections =>
-      prevSections.map((section, idx) =>
-        idx === sectionIndex ? { ...section, ...updatedData } : section
-      )
+  const persistAfterUpdate = (updatedSections: SurveySection[]) => {
+    const templateId = activeTemplate?.id || locallySelectedTemplate?.id;
+    persistCurrentTemplateCustomizations(
+      templateId,
+      updatedSections,
+      customizedFrameworkSections,
+      customizedScreenerSections,
+      setTemplateCustomizations
     );
+  };
+
+  const handleSectionChange = (sectionIndex: number, updatedData: Partial<SurveySection>) => {
+    setSurveySections(prevSections => {
+      const updatedSections = prevSections.map((section, idx) =>
+        idx === sectionIndex ? { ...section, ...updatedData } : section
+      );
+      persistCurrentTemplateCustomizations(
+        getCurrentTemplateId(),
+        updatedSections,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
+      return updatedSections;
+    });
   };
 
   const handleQuestionChange = (sectionIndex: number, questionIndex: number, updatedData: Partial<SurveyQuestion>) => {
@@ -483,6 +541,13 @@ export default function DesignPage() {
       newQuestions[questionIndex] = { ...newQuestions[questionIndex], ...updatedData };
       targetSection.questions = newQuestions;
       newSections[sectionIndex] = targetSection;
+      persistCurrentTemplateCustomizations(
+        getCurrentTemplateId(),
+        newSections,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
       return newSections;
     });
   };
@@ -493,37 +558,37 @@ export default function DesignPage() {
       const sectionToUpdate = { ...sectionsCopy[sectionIndex] };
       const questionsInSection = [...sectionToUpdate.questions];
       const questionToUpdate = { ...questionsInSection[questionIndex] };
-
       if (!questionToUpdate.options) {
         questionToUpdate.options = [];
       }
       const optionsArray = [...questionToUpdate.options];
-
       if (optionIndex >= optionsArray.length) {
         if (questionToUpdate.questionType === 'screener' && newTextValue.includes(screenInMarker)) {
           optionsArray.push(newTextValue);
         } else if (questionToUpdate.questionType === 'screener') {
           optionsArray.push(newTextValue.trim());
-        }
-         else {
+        } else {
           optionsArray.push(newTextValue);
         }
       } else {
         const currentOptionFullText = optionsArray[optionIndex];
         let finalNewOptionText = newTextValue;
-
         if (questionToUpdate.questionType === 'screener' && currentOptionFullText.includes(screenInMarker)) {
           finalNewOptionText = `${newTextValue.trim()} ${screenInMarker}`;
         }
-
         optionsArray[optionIndex] = finalNewOptionText;
       }
-
       questionToUpdate.options = optionsArray;
       questionsInSection[questionIndex] = questionToUpdate;
       sectionToUpdate.questions = questionsInSection;
       sectionsCopy[sectionIndex] = sectionToUpdate;
-
+      persistCurrentTemplateCustomizations(
+        getCurrentTemplateId(),
+        sectionsCopy,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
       return sectionsCopy;
     });
   };
@@ -534,17 +599,21 @@ export default function DesignPage() {
       const sectionToUpdate = { ...sectionsCopy[sectionIndex] };
       const questionsInSection = [...sectionToUpdate.questions];
       const questionToUpdate = { ...questionsInSection[questionIndex] };
-
       if (questionToUpdate.options) {
         const optionsArray = [...questionToUpdate.options];
         optionsArray.splice(optionIndex, 1);
         questionToUpdate.options = optionsArray;
       }
-
       questionsInSection[questionIndex] = questionToUpdate;
       sectionToUpdate.questions = questionsInSection;
       sectionsCopy[sectionIndex] = sectionToUpdate;
-
+      persistCurrentTemplateCustomizations(
+        getCurrentTemplateId(),
+        sectionsCopy,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
       return sectionsCopy;
     });
   };
@@ -555,27 +624,28 @@ export default function DesignPage() {
       const sectionToUpdate = { ...sectionsCopy[sectionIndex] };
       const questionsInSection = [...sectionToUpdate.questions];
       const questionToUpdate = { ...questionsInSection[questionIndex] };
-
       if (questionToUpdate.questionType !== 'screener' || !questionToUpdate.options) return prevSections;
-
       const optionsArray = [...questionToUpdate.options];
       let currentOptionText = optionsArray[optionIndex];
-
       if (currentOptionText.includes(screenInMarker)) {
         currentOptionText = currentOptionText.replace(screenInMarker, '').trim();
       }
-
       if (isChecked) {
         optionsArray[optionIndex] = `${currentOptionText} ${screenInMarker}`;
       } else {
         optionsArray[optionIndex] = currentOptionText;
       }
-
       questionToUpdate.options = optionsArray;
       questionsInSection[questionIndex] = questionToUpdate;
       sectionToUpdate.questions = questionsInSection;
       sectionsCopy[sectionIndex] = sectionToUpdate;
-
+      persistCurrentTemplateCustomizations(
+        getCurrentTemplateId(),
+        sectionsCopy,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
       return sectionsCopy;
     });
   };
@@ -587,7 +657,15 @@ export default function DesignPage() {
         sectionDescription: '',
         questions: []
       };
-      return [...prevSections, newSection];
+      const updatedSections = [...prevSections, newSection];
+      persistCurrentTemplateCustomizations(
+        getCurrentTemplateId(),
+        updatedSections,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
+      return updatedSections;
     });
   };
 
@@ -595,15 +673,20 @@ export default function DesignPage() {
     setSurveySections(prevSections => {
       const newSections = [...prevSections];
       const targetSection = { ...newSections[sectionIndex] };
-
       const newQuestion: SurveyQuestion = {
         questionText: `New Question ${targetSection.questions.length + 1}`,
         questionType: 'openText',
         options: []
       };
-
       targetSection.questions = [...targetSection.questions, newQuestion];
       newSections[sectionIndex] = targetSection;
+      persistCurrentTemplateCustomizations(
+        getCurrentTemplateId(),
+        newSections,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
       return newSections;
     });
   };
@@ -613,6 +696,13 @@ export default function DesignPage() {
       const newSections = [...prevSections];
       const [draggedSection] = newSections.splice(draggedSectionIndex, 1);
       newSections.splice(targetSectionIndex, 0, draggedSection);
+      persistCurrentTemplateCustomizations(
+        getCurrentTemplateId(),
+        newSections,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
       return newSections;
     });
   };
@@ -626,6 +716,13 @@ export default function DesignPage() {
       newQuestions.splice(targetQuestionIndex, 0, draggedQuestion);
       targetSection.questions = newQuestions;
       newSections[sectionIndex] = targetSection;
+      persistCurrentTemplateCustomizations(
+        getCurrentTemplateId(),
+        newSections,
+        customizedFrameworkSections,
+        customizedScreenerSections,
+        setTemplateCustomizations
+      );
       return newSections;
     });
   };
@@ -692,13 +789,25 @@ export default function DesignPage() {
     }
   };
 
-  const handleSaveCustomizedScreenerSections = React.useCallback((updatedSections: FrameworkSection[]) => {
-    setCustomizedScreenerSections(updatedSections);
-  }, []);
-
   const handleSaveCustomizedContentSections = React.useCallback((updatedSections: FrameworkSection[]) => {
     setCustomizedFrameworkSections(updatedSections);
-  }, []);
+    
+    // Save to template customizations
+    const currentTemplateId = activeTemplate?.id || locallySelectedTemplate?.id;
+    if (currentTemplateId) {
+      persistCurrentTemplateCustomizations(currentTemplateId, surveySections, updatedSections, customizedScreenerSections, setTemplateCustomizations);
+    }
+  }, [activeTemplate?.id, locallySelectedTemplate?.id, surveySections, customizedScreenerSections]);
+
+  const handleSaveCustomizedScreenerSections = React.useCallback((updatedSections: FrameworkSection[]) => {
+    setCustomizedScreenerSections(updatedSections);
+    
+    // Save to template customizations
+    const currentTemplateId = activeTemplate?.id || locallySelectedTemplate?.id;
+    if (currentTemplateId) {
+      persistCurrentTemplateCustomizations(currentTemplateId, surveySections, customizedFrameworkSections, updatedSections, setTemplateCustomizations);
+    }
+  }, [activeTemplate?.id, locallySelectedTemplate?.id, surveySections, customizedFrameworkSections]);
   
   const handleOpenCustomizeModal = React.useCallback(() => {
     setIsCustomizeSectionsModalOpen(true);
@@ -853,6 +962,32 @@ export default function DesignPage() {
       onFinishSetup={handleFinishSetup}
     />
   );
+
+  // Helper to get current template id
+  const getCurrentTemplateId = () => activeTemplate?.id || locallySelectedTemplate?.id;
+
+  // Utility function to persist current template customizations
+  function persistCurrentTemplateCustomizations(
+    templateId: string | undefined,
+    surveySections: SurveySection[],
+    customizedFrameworkSections: FrameworkSection[] | null,
+    customizedScreenerSections: FrameworkSection[] | null,
+    setTemplateCustomizations: React.Dispatch<React.SetStateAction<Record<string, {
+      sections: SurveySection[],
+      frameworkSections: FrameworkSection[] | null,
+      screenerSections: FrameworkSection[] | null
+    }>>>
+  ) {
+    if (!templateId) return;
+    setTemplateCustomizations((prev) => ({
+      ...prev,
+      [templateId]: {
+        sections: surveySections,
+        frameworkSections: customizedFrameworkSections,
+        screenerSections: customizedScreenerSections,
+      }
+    }));
+  }
 
   if (!isClient) {
     return (

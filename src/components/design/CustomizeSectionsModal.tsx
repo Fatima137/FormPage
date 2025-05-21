@@ -14,7 +14,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import type { FrameworkSection } from '@/config/exploreTemplates';
 import { cn } from '@/lib/utils';
-import { Settings2, Filter, ArrowLeft, Repeat, PlusCircle, Puzzle, type LucideIcon, SlidersHorizontal } from 'lucide-react';
+import { Settings2, Filter, ArrowLeft, Repeat, PlusCircle, Puzzle, type LucideIcon, SlidersHorizontal, Eye, EyeOff } from 'lucide-react';
 import { SectionDisplayCard } from './SectionDisplayCard';
 import { PathwayTile } from './PathwayTile';
 import { renderQuestionTextWithPlaceholdersGlobal, QuestionTypeIcon } from '@/config/surveyUtils';
@@ -52,14 +52,17 @@ export function CustomizeSectionsModal({
     new Set(currentContentSections.map(s => s.title))
   );
   
-  const [modalStep, setModalStep] = React.useState<'contentEditor' | 'screenerEditor'>('contentEditor');
   const [addTabContentView, setAddTabContentView] = React.useState<'pathways' | 'section_picker'>('pathways');
   
   const [activeContentEditorTab, setActiveContentEditorTab] = React.useState<'included' | 'addMore'>('included');
-  const [activeScreenerEditorTab, setActiveScreenerEditorTab] = React.useState<'included' | 'addScreeners'>('included');
+  
+  const [newlyAddedTitles, setNewlyAddedTitles] = React.useState<Set<string>>(new Set());
+  
   const [openAddSectionCards, setOpenAddSectionCards] = React.useState<string[]>([]);
   
-  const [newlyAddedContentTitles, setNewlyAddedContentTitles] = React.useState<Set<string>>(new Set());
+  const [addFilter, setAddFilter] = React.useState<'all' | 'screeners' | 'content'>('all');
+  
+  const [expandAllQuestions, setExpandAllQuestions] = React.useState(false);
   
   const isFirstOpen = React.useRef(true);
 
@@ -67,14 +70,11 @@ export function CustomizeSectionsModal({
     if (isOpen) {
       setSelectedScreenerTitles(new Set(currentScreenerSections.map(s => s.title)));
       setSelectedContentSectionTitles(new Set(currentContentSections.map(s => s.title)));
-      setModalStep('contentEditor');
       setAddTabContentView('pathways');
-      setActiveContentEditorTab('addMore');
-      setActiveScreenerEditorTab('included');
+      setActiveContentEditorTab('included');
       isFirstOpen.current = false;
     } else {
       isFirstOpen.current = true; 
-      setOpenAddSectionCards([]);
     }
   }, [isOpen, currentScreenerSections, currentContentSections]);
 
@@ -83,25 +83,31 @@ export function CustomizeSectionsModal({
     sectionTitle: string,
     sectionType: 'screener' | 'content'
   ) => {
-    const currentSet = sectionType === 'screener' ? selectedScreenerTitles : selectedContentSectionTitles;
-    const setter = sectionType === 'screener' ? setSelectedScreenerTitles : setSelectedContentSectionTitles;
-
-    setter(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(sectionTitle)) {
-        newSet.delete(sectionTitle);
-      } else {
-        newSet.add(sectionTitle);
-      }
-      return newSet;
-    });
-
-    if (sectionType === 'content') {
-      if (newlyAddedContentTitles.has(sectionTitle)) {
-        setNewlyAddedContentTitles(prev => new Set(prev.filter(t => t !== sectionTitle)));
-      } else {
-        setNewlyAddedContentTitles(prev => new Set(prev.add(sectionTitle)));
-      }
+    if (sectionType === 'screener') {
+      setSelectedScreenerTitles(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(sectionTitle)) {
+          newSet.delete(sectionTitle);
+        } else {
+          newSet.add(sectionTitle);
+        }
+        return newSet;
+      });
+    } else {
+      setSelectedContentSectionTitles(prev => {
+        const newSet = new Set(prev);
+        if (newSet.has(sectionTitle)) {
+          newSet.delete(sectionTitle);
+        } else {
+          newSet.add(sectionTitle);
+        }
+        return newSet;
+      });
+    }
+    if (newlyAddedTitles.has(sectionTitle)) {
+      setNewlyAddedTitles(prev => new Set([...prev].filter(t => t !== sectionTitle)));
+    } else {
+      setNewlyAddedTitles(prev => new Set(prev).add(sectionTitle));
     }
   };
   
@@ -136,127 +142,110 @@ export function CustomizeSectionsModal({
   };
 
   const handleSaveContent = () => {
-    const finalContentSections = buildFinalSections(selectedContentSectionTitles, currentContentSections, allAvailableContentSections);
+    const finalContentSections = buildFinalSections(
+      selectedContentSectionTitles,
+      currentContentSections,
+      allAvailableContentSections
+    );
+    const finalScreenerSections = buildFinalSections(
+      selectedScreenerTitles,
+      currentScreenerSections,
+      allAvailableScreenerSections
+    );
     onSaveContentSections(finalContentSections);
+    onSaveScreeners(finalScreenerSections);
     onClose();
   };
 
   const handleSaveScreenersAndContinue = () => {
     const finalScreenerSections = buildFinalSections(selectedScreenerTitles, currentScreenerSections, allAvailableScreenerSections);
     onSaveScreeners(finalScreenerSections);
-    setModalStep('contentEditor');
     setAddTabContentView('pathways'); 
     setActiveContentEditorTab('included'); 
   };
   
-  const sectionsToDisplayInIncludedTab = React.useCallback((sectionType: 'screener' | 'content'): FrameworkSection[] => {
-    const selectedTitles = sectionType === 'screener' ? selectedScreenerTitles : selectedContentSectionTitles;
-    const originalSections = sectionType === 'screener' ? currentScreenerSections : currentContentSections;
-    const allAvailable = sectionType === 'screener' ? allAvailableScreenerSections : allAvailableContentSections;
-    
-    const included: FrameworkSection[] = [];
-    const titlesInAllAvailable = new Map(allAvailable.map(s => [s.title, s]));
+  const includedScreeners = allAvailableScreenerSections.filter(s => selectedScreenerTitles.has(s.title));
+  const includedContentSections = allAvailableContentSections.filter(s => selectedContentSectionTitles.has(s.title));
 
-    originalSections.forEach(originalSection => {
-        if (selectedTitles.has(originalSection.title)) {
-            const sectionDetail = titlesInAllAvailable.get(originalSection.title);
-            if (sectionDetail) included.push(sectionDetail);
-        }
-    });
-    selectedTitles.forEach(title => {
-        if (!included.some(s => s.title === title)) {
-            const sectionDetail = titlesInAllAvailable.get(title);
-            if (sectionDetail) included.push(sectionDetail);
-        }
-    });
-    return included;
-  }, [selectedScreenerTitles, selectedContentSectionTitles, currentScreenerSections, currentContentSections, allAvailableScreenerSections, allAvailableContentSections]);
+  const includedSectionsForDisplay = [
+    ...includedScreeners,
+    ...includedContentSections,
+  ];
 
-  const availableToAddSections = React.useCallback((sectionType: 'screener' | 'content'): FrameworkSection[] => {
-    const selectedTitles = sectionType === 'screener' ? selectedScreenerTitles : selectedContentSectionTitles;
-    const allAvailable = sectionType === 'screener' ? allAvailableScreenerSections : allAvailableContentSections;
-    return allAvailable.filter(s => !selectedTitles.has(s.title));
-  }, [selectedScreenerTitles, selectedContentSectionTitles, allAvailableScreenerSections, allAvailableContentSections]);
-
-
- const renderSectionList = (
+  const renderSectionList = (
     sections: FrameworkSection[],
     isCurrentlyIncludedBehavior: boolean,
     sectionTypeForToggle: 'screener' | 'content',
     editorViewType: 'included_content' | 'add_content' | 'included_screeners' | 'add_screeners',
     newlyAddedTitles: Set<string> = new Set()
   ) => {
-    const gridClass = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-1.5";
-    const isExpandableContext = editorViewType === 'add_content' || editorViewType === 'add_screeners';
+    const filteredSections = sections.filter(section => {
+      if (isCurrentlyIncludedBehavior) {
+        return sectionTypeForToggle === 'screener' 
+          ? selectedScreenerTitles.has(section.title)
+          : selectedContentSectionTitles.has(section.title);
+      }
+      return sectionTypeForToggle === 'screener'
+        ? !selectedScreenerTitles.has(section.title)
+        : !selectedContentSectionTitles.has(section.title);
+    });
 
-    let filteredSections = sections;
-    if (editorViewType === 'add_screeners') {
-      const excludedScreenerTitles = [
-        "Screener: General Qualification",
-        "Screener: Product Ownership",
-      ];
-      // Retain "Screener: Purchase channel usage" if it exists
-      filteredSections = sections.filter(s => !excludedScreenerTitles.includes(s.title));
-    }
-    
-    if (filteredSections.length === 0) {
-      const message = isCurrentlyIncludedBehavior 
-        ? "No sections currently included."
-        : "All available sections are currently included, or none match the current filter.";
-      return <p className="text-sm text-muted-foreground text-center py-8">{message}</p>;
-    }
-  
+    const gridClass = "grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4";
+    const isExpandableContext = !isCurrentlyIncludedBehavior;
+
     if (isExpandableContext) {
       return (
-        <Accordion type="multiple" value={openAddSectionCards} onValueChange={setOpenAddSectionCards} className="w-full">
-            <div className={gridClass}>
-                {filteredSections.map((section) => (
-                     <AccordionItem value={section.title} key={section.title} className="border-none break-inside-avoid">
-                        <SectionDisplayCard
-                            section={section}
-                            isCurrentlyIncluded={isCurrentlyIncludedBehavior}
-                            onToggleSection={() => handleToggleSection(section.title, sectionTypeForToggle)}
-                            solutionType={solutionType}
-                            isExpandable={true}
-                            isExpanded={openAddSectionCards.includes(section.title)}
-                            onToggleExpand={() => setOpenAddSectionCards(prev => 
-                                prev.includes(section.title) ? prev.filter(t => t !== section.title) : [...prev, section.title]
-                            )}
-                            cardColor={isCurrentlyIncludedBehavior ? 'green' : (newlyAddedTitles.has(section.title) ? 'purple' : undefined)}
-                        >
-                            {section.exampleQuestions && section.exampleQuestions.length > 0 && (
-                               <AccordionContent className="pt-2 pb-1">
-                                 <ul className="space-y-1 text-xs text-muted-foreground">
-                                   {section.exampleQuestions.map((q, qIdx) => (
-                                     <li key={qIdx} className="flex items-start">
-                                       <QuestionTypeIcon type={q.questionType} className="mr-1.5 mt-0.5 shrink-0 h-3.5 w-3.5" />
-                                       <span>{renderQuestionTextWithPlaceholdersGlobal(q.questionText, {}, true)}</span>
-                                     </li>
-                                   ))}
-                                 </ul>
-                               </AccordionContent>
-                            )}
-                        </SectionDisplayCard>
-                     </AccordionItem>
-                ))}
-            </div>
+        <Accordion 
+          type="multiple" 
+          value={expandAllQuestions ? filteredSections.map(s => s.title) : openAddSectionCards} 
+          onValueChange={setOpenAddSectionCards} 
+          className="w-full"
+        >
+          <div className={gridClass}>
+            {filteredSections.map((section) => (
+              <SectionDisplayCard
+                key={section.title}
+                section={section}
+                isCurrentlyIncluded={isCurrentlyIncludedBehavior}
+                onToggleSection={() => handleToggleSection(section.title, sectionTypeForToggle)}
+                solutionType={solutionType}
+                isExpandable={true}
+                isExpanded={expandAllQuestions}
+                cardColor={newlyAddedTitles.has(section.title) ? 'purple' : undefined}
+              >
+                {section.questions && section.questions.length > 0 && (
+                  <div className="space-y-2">
+                    {section.questions.map((question, index) => (
+                      <div key={index} className="flex items-start gap-2 text-sm">
+                        <QuestionTypeIcon type={question.type} className="h-4 w-4 mt-0.5 shrink-0" />
+                        <span className="text-muted-foreground">
+                          {renderQuestionTextWithPlaceholdersGlobal(question.text)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </SectionDisplayCard>
+            ))}
+          </div>
         </Accordion>
       );
     }
-    // For "Included" tab rendering (not expandable)
+    // For included list (not expandable)
     return (
-        <div className={gridClass}>
-            {filteredSections.map((section) => (
-                <SectionDisplayCard
-                    key={section.title}
-                    section={section}
-                    isCurrentlyIncluded={isCurrentlyIncludedBehavior}
-                    onToggleSection={() => handleToggleSection(section.title, sectionTypeForToggle)}
-                    solutionType={solutionType}
-                    isExpandable={false} 
-                />
-            ))}
-        </div>
+      <div className={gridClass}>
+        {filteredSections.map((section) => (
+          <SectionDisplayCard
+            key={section.title}
+            section={section}
+            isCurrentlyIncluded={isCurrentlyIncludedBehavior}
+            onToggleSection={() => handleToggleSection(section.title, sectionTypeForToggle)}
+            solutionType={solutionType}
+            isExpandable={false}
+            cardColor={isCurrentlyIncludedBehavior ? 'green' : (newlyAddedTitles.has(section.title) ? 'purple' : undefined)}
+          />
+        ))}
+      </div>
     );
   };
 
@@ -264,54 +253,66 @@ export function CustomizeSectionsModal({
   const renderPathwayView = () => (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
       <PathwayTile
-        title="Swap your screeners"
-        description="Swap out the default screeners with other best-practice options for qualifying respondents."
+        title="Add screeners"
+        description="Add screener question groups to qualify your respondents."
         Icon={Repeat}
         onClick={() => {
-          setModalStep('screenerEditor');
-          setActiveScreenerEditorTab('addScreeners');
+          setAddTabContentView('section_picker');
+          setAddFilter('screeners');
+          setActiveContentEditorTab('addMore');
         }}
       />
       <PathwayTile
-        title={`Add from "${activeTemplateTitle}" Template`}
-        description={`Extend your survey with additional questions that are tailored to the "${activeTemplateTitle}" template.`}
+        title="Add from this template"
+        description={`Extend your survey with additional questions that are tailored to the \"${activeTemplateTitle}\" template.`}
         Icon={PlusCircle}
         onClick={() => {
           setAddTabContentView('section_picker');
-          setActiveContentEditorTab('addMore'); 
+          setAddFilter('content');
+          setActiveContentEditorTab('addMore');
         }}
       />
       <PathwayTile
-        title="Add from Other Templates"
+        title="Add from other templates"
         description="Mix and match question groups from our other research templates (e.g., Shopper & purchases, Brand)."
         Icon={Puzzle}
         onClick={() => {
           setAddTabContentView('section_picker');
+          setAddFilter('content');
           setActiveContentEditorTab('addMore');
         }}
       />
     </div>
   );
 
-  const renderEditorView = (editorSectionType: 'content' | 'screener') => {
-    const currentTabState = editorSectionType === 'content' ? activeContentEditorTab : activeScreenerEditorTab;
-    const setTabState = editorSectionType === 'content' ? setActiveContentEditorTab : setActiveScreenerEditorTab;
-    
-    const includedSectionsForDisplay = sectionsToDisplayInIncludedTab(editorSectionType);
-    const includedTabLabel = editorSectionType === 'content' ? `Included in the template (${includedSectionsForDisplay.length})` : `Included Screeners (${includedSectionsForDisplay.length})`;
-    
-    const addTabLabel = editorSectionType === 'content' ? "Add question groups" : "Add Screeners";
-    const addTabValue = editorSectionType === 'content' ? "addMore" : "addScreeners";
-    const includedViewType = editorSectionType === 'content' ? 'included_content' : 'included_screeners';
-    const addViewType = editorSectionType === 'content' ? 'add_content' : 'add_screeners';
+  const getAvailableSections = () => {
+    if (addFilter === 'screeners') {
+      return allAvailableScreenerSections.filter(s => !selectedScreenerTitles.has(s.title));
+    } else if (addFilter === 'content') {
+      return allAvailableContentSections.filter(s => !selectedContentSectionTitles.has(s.title));
+    }
+    return [
+      ...allAvailableScreenerSections.filter(s => !selectedScreenerTitles.has(s.title)),
+      ...allAvailableContentSections.filter(s => !selectedContentSectionTitles.has(s.title)),
+    ];
+  };
+
+  const renderEditorView = () => {
+    const currentTabState = activeContentEditorTab;
+    const setTabState = setActiveContentEditorTab;
+    const includedTabLabel = `Included in the template (${includedScreeners.length + includedContentSections.length})`;
+    const addTabLabel = 'Add question groups';
+    const addTabValue = 'addMore';
+    const includedViewType = 'included_content';
+    const addViewType = 'add_content';
 
     return (
       <Tabs 
         value={currentTabState} 
         onValueChange={(value) => {
           setTabState(value as any);
-          if (editorSectionType === 'content' && value === 'addMore') {
-            setAddTabContentView('pathways'); // Reset to pathways when 'Add more' tab is clicked
+          if (value === 'addMore') {
+            setAddTabContentView('pathways');
           }
         }} 
         className="flex flex-col flex-grow min-h-0"
@@ -328,25 +329,69 @@ export function CustomizeSectionsModal({
         </TabsList>
         <ScrollArea className="flex-grow h-0 px-6 pb-6">
           <TabsContent value="included">
-            {renderSectionList(includedSectionsForDisplay, true, editorSectionType, includedViewType, newlyAddedContentTitles)}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 p-2 auto-rows-fr">
+              {includedSectionsForDisplay.map((section) => (
+                <SectionDisplayCard
+                  key={section.title}
+                  section={section}
+                  isCurrentlyIncluded={true}
+                  onToggleSection={() => handleToggleSection(section.title, allAvailableScreenerSections.some(s => s.title === section.title) ? 'screener' : 'content')}
+                  solutionType={solutionType}
+                  cardColor={'green'}
+                  showQuestions={false}
+                  className="min-h-[120px] h-full flex flex-col justify-between"
+                />
+              ))}
+            </div>
           </TabsContent>
           <TabsContent value={addTabValue}>
-            {editorSectionType === 'content' && addTabContentView === 'pathways' ? (
+            {addTabContentView === 'pathways' ? (
               renderPathwayView()
             ) : (
               <>
-                {(editorSectionType === 'content' && addTabContentView === 'section_picker') && (
+                <div className="flex items-center justify-between mb-4">
                   <Button 
                     variant="outline" 
                     size="sm" 
                     onClick={() => setAddTabContentView('pathways')} 
-                    className="mb-4 text-sm"
+                    className="text-sm"
                   >
                     <ArrowLeft className="h-4 w-4 mr-2" />
                     Back to Add Options
                   </Button>
-                )}
-                {renderSectionList(availableToAddSections(editorSectionType), false, editorSectionType, addViewType, newlyAddedContentTitles)}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setExpandAllQuestions(!expandAllQuestions)}
+                    className="flex items-center gap-2 text-sm"
+                  >
+                    {expandAllQuestions ? (
+                      <>
+                        <EyeOff className="h-4 w-4" />
+                        Hide Questions
+                      </>
+                    ) : (
+                      <>
+                        <Eye className="h-4 w-4" />
+                        View Questions
+                      </>
+                    )}
+                  </Button>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {getAvailableSections().map((section) => (
+                    <SectionDisplayCard
+                      key={section.title}
+                      section={section}
+                      isCurrentlyIncluded={false}
+                      onToggleSection={() => handleToggleSection(section.title, addFilter === 'screeners' ? 'screener' : 'content')}
+                      solutionType={solutionType}
+                      cardColor={newlyAddedTitles.has(section.title) ? 'purple' : undefined}
+                      showQuestions={expandAllQuestions}
+                      className="min-h-[120px] h-full flex flex-col justify-between"
+                    />
+                  ))}
+                </div>
               </>
             )}
           </TabsContent>
@@ -367,7 +412,7 @@ export function CustomizeSectionsModal({
           Refine your survey by adding or removing question groups.
         </DialogDescription>
       </DialogHeader>
-      {renderEditorView('content')}
+      {renderEditorView()}
       <DialogFooter className="p-6 pt-4 border-t">
         <Button 
             onClick={handleSaveContent}
@@ -379,43 +424,10 @@ export function CustomizeSectionsModal({
     </>
   );
 
-  const renderScreenerEditor = () => (
-     <>
-      <DialogHeader className="p-6 pb-4 border-b">
-        <DialogTitle className="flex items-center text-2xl font-bold">
-          <Filter className="h-6 w-6 mr-3 text-[hsl(var(--lavender-accent))]"/>
-          Customize Screener Sections
-        </DialogTitle>
-        <DialogDescription className="text-base">
-          Select the screener questions to qualify your respondents.
-        </DialogDescription>
-      </DialogHeader>
-      {renderEditorView('screener')}
-      <DialogFooter className="p-6 pt-4 border-t flex justify-between">
-        <Button 
-            variant="outline"
-            onClick={() => {
-                setModalStep('contentEditor');
-                setAddTabContentView('pathways');
-                setActiveContentEditorTab('addMore'); 
-            }}
-        >
-            Back to Content Sections
-        </Button>
-        <Button 
-            onClick={handleSaveScreenersAndContinue}
-            className="bg-[hsl(var(--primary))] text-primary-foreground hover:bg-[hsl(var(--button-hover))]"
-        >
-            Save Screeners & Edit Content
-        </Button>
-      </DialogFooter>
-    </>
-  );
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-3xl h-[90vh] flex flex-col p-0">
-        {modalStep === 'contentEditor' ? renderContentEditor() : renderScreenerEditor()}
+        {renderContentEditor()}
       </DialogContent>
     </Dialog>
   );

@@ -1,4 +1,3 @@
-
 'use client';
 
 import * as React from 'react';
@@ -133,7 +132,7 @@ export function ConfigurationPanel({
   }, [timeSeriesConfig]);
 
   const handleInternalSampleSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newSize = Math.max(10, parseInt(e.target.value, 10) || 10);
+    const newSize = Math.max(51, parseInt(e.target.value, 10) || 51);
     setInternalSampleSize(newSize);
     onSampleSizeChange(newSize);
   };
@@ -293,7 +292,7 @@ export function ConfigurationPanel({
                     type="number"
                     value={internalSampleSize}
                     onChange={handleInternalSampleSizeChange}
-                    min="10"
+                    min="51"
                     className="h-9 text-sm focus-visible:ring-[hsl(var(--primary))] w-28"
                   />
                   <TooltipProvider delayDuration={100}>

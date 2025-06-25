@@ -72,9 +72,11 @@ export function CustomizeSectionsModal({
       setSelectedContentSectionTitles(new Set(currentContentSections.map(s => s.title)));
       setAddTabContentView('pathways');
       setActiveContentEditorTab('included');
+      setNewlyAddedTitles(new Set());
+      setOpenAddSectionCards([]);
+      setAddFilter('all');
+      setExpandAllQuestions(false);
       isFirstOpen.current = false;
-    } else {
-      isFirstOpen.current = true; 
     }
   }, [isOpen, currentScreenerSections, currentContentSections]);
 
@@ -152,8 +154,24 @@ export function CustomizeSectionsModal({
       currentScreenerSections,
       allAvailableScreenerSections
     );
+    
     onSaveContentSections(finalContentSections);
     onSaveScreeners(finalScreenerSections);
+    
+    if (typeof window !== 'undefined' && window.dispatchEvent) {
+      window.dispatchEvent(new CustomEvent('customizeSectionsSaved', {
+        detail: {
+          screenerSections: finalScreenerSections,
+          contentSections: finalContentSections,
+        }
+      }));
+    }
+    
+    setSelectedScreenerTitles(new Set(finalScreenerSections.map(s => s.title)));
+    setSelectedContentSectionTitles(new Set(finalContentSections.map(s => s.title)));
+    setNewlyAddedTitles(new Set());
+    setOpenAddSectionCards([]);
+    
     onClose();
   };
 

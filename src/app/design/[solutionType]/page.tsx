@@ -220,13 +220,12 @@ export default function DesignPage() {
     }
   }, []);
 
-  const generateSurveyPrompt = React.useCallback((template: AnySolutionTemplate, answers: Record<string, string>): string => {
+  const generateSurveyPrompt = React.useCallback((template: AnySolutionTemplate, answers: Record<string, string>, fullSurveyPreview?: SurveySection[]): string => {
     let prompt = template.initialPromptSeed;
 
     const currentScreeners = customizedScreenerSections || template.frameworkSections.filter(s => s.title.toLowerCase().startsWith('screener:'));
     const currentContent = customizedFrameworkSections || template.frameworkSections.filter(s => !s.title.toLowerCase().startsWith('screener:'));
     const currentFramework = [...currentScreeners, ...currentContent];
-
 
     if (solutionType === 'explore' && 'frameworkSections' in template && template.id === 'themes') {
         const typedTemplate = template as ExploreTemplate;
@@ -288,8 +287,28 @@ export default function DesignPage() {
       `The survey MUST be structured into the following sections. Each section MUST have a 'sectionTitle', an optional 'sectionDescription', and an array of 'questions'. The section titles MUST BE EXACTLY: ${JSON.stringify(frameworkSectionTitles)}.`
     );
 
-
     prompt = prompt.replace(/{[a-zA-Z0-9_]+\}/g, "relevant details");
+
+    // --- NEW: Add full survey preview (sections, questions, types, options) ---
+    let previewToUse = fullSurveyPreview && fullSurveyPreview.length > 0 ? fullSurveyPreview : undefined;
+    // If not available, try to build from framework with exampleQuestions
+    if (!previewToUse) {
+      previewToUse = currentFramework.map(section => ({
+        sectionTitle: section.title,
+        sectionDescription: section.description || '',
+        questions: (section.exampleQuestions || []).map(q => ({
+          questionText: q.questionText,
+          questionType: q.questionType,
+          options: q.options || []
+        }))
+      }));
+    }
+    if (previewToUse && previewToUse.length > 0) {
+      prompt += `\n\nSurvey Preview (sections, questions, types, options):\n`;
+      prompt += JSON.stringify(previewToUse, null, 2);
+    }
+    // --- END NEW ---
+
     return prompt;
   }, [solutionType, customizedFrameworkSections, customizedScreenerSections]);
 
@@ -325,12 +344,12 @@ export default function DesignPage() {
          setIsGenerating(false);
          return;
       }
-      surveyDescription = generateSurveyPrompt(activeTemplate, currentFollowUpAnswers);
+      // Pass the full survey preview (surveySections) if available
+      surveyDescription = generateSurveyPrompt(activeTemplate, currentFollowUpAnswers, surveySections);
     }
 
     const marketString = selectedCountries.map(c => c.label).join(', ');
     const projectContext = currentFollowUpAnswers['projectBigQuestion'] || undefined;
-
 
     try {
       const inputForFlow: SuggestSurveyQuestionsInput = {
@@ -988,6 +1007,56 @@ export default function DesignPage() {
       }
     }));
   }
+
+  React.useEffect(() => {
+    function handleCustomizeSectionsSaved(event: CustomEvent) {
+      const { screenerSections, contentSections } = event.detail;
+
+      // When the customize modal is saved, update surveySections to reflect the latest customized sections
+      // Use the customizedScreenerSections and customizedFrameworkSections to build the new surveySections structure
+      const allSections = [
+        ...(screenerSections || []),
+        ...(contentSections || [])
+      ];
+
+      // Convert FrameworkSection[] to SurveySection[] with empty questions (or use exampleQuestions if available)
+      const newSurveySections = allSections.map(section => ({
+        sectionTitle: section.title,
+        sectionDescription: section.description || '',
+        questions: (section.exampleQuestions || []).map((q: SurveyQuestion) => ({
+          questionText: q.questionText,
+          questionType: q.questionType,
+          options: q.options || []
+        }))
+      }));
+
+      // Update the survey sections state
+      // setSurveySections(newSurveySections);
+
+      // Persist the customizations as the latest source of truth
+      const templateId = getCurrentTemplateId();
+      if (templateId) {
+        setTemplateCustomizations(prev => ({
+          ...prev,
+          [templateId]: {
+            sections: newSurveySections,
+            frameworkSections: contentSections,
+            screenerSections: screenerSections,
+          }
+        }));
+      }
+
+      // Reset any state that might prevent further customization
+      setIsEditMode(false);
+      setInitialFrameworkAnimationDone(true);
+      setExpandAllSections(true);
+    }
+
+    window.addEventListener('customizeSectionsSaved', handleCustomizeSectionsSaved as EventListener);
+    return () => {
+      window.removeEventListener('customizeSectionsSaved', handleCustomizeSectionsSaved as EventListener);
+    };
+  }, [activeTemplate, locallySelectedTemplate]);
 
   if (!isClient) {
     return (
